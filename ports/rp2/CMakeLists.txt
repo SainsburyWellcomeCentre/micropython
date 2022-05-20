@@ -34,7 +34,7 @@ if(NOT EXISTS ${MICROPY_BOARD_DIR}/mpconfigboard.cmake)
 endif()
 
 # Include board config
-include(${MICROPY_BOARD_DIR}/mpconfigboard.cmake) 
+include(${MICROPY_BOARD_DIR}/mpconfigboard.cmake)
 
 # Set the PICO_BOARD if it's not already set (allow a board to override it).
 if(NOT PICO_BOARD)
@@ -95,9 +95,11 @@ set(MICROPY_SOURCE_PORT
     machine_uart.c
     machine_wdt.c
     main.c
+    modharpsync.c
     modmachine.c
     modrp2.c
     moduos.c
+    modusbcdc.c
     modutime.c
     mphalport.c
     mpthreadport.c
@@ -122,9 +124,11 @@ set(MICROPY_SOURCE_QSTR
     ${PROJECT_SOURCE_DIR}/machine_timer.c
     ${PROJECT_SOURCE_DIR}/machine_uart.c
     ${PROJECT_SOURCE_DIR}/machine_wdt.c
+    ${PROJECT_SOURCE_DIR}/modharpsync.c
     ${PROJECT_SOURCE_DIR}/modmachine.c
     ${PROJECT_SOURCE_DIR}/modrp2.c
     ${PROJECT_SOURCE_DIR}/moduos.c
+    ${PROJECT_SOURCE_DIR}/modusbcdc.c
     ${PROJECT_SOURCE_DIR}/modutime.c
     ${PROJECT_SOURCE_DIR}/rp2_flash.c
     ${PROJECT_SOURCE_DIR}/rp2_pio.c
@@ -238,6 +242,7 @@ target_include_directories(${MICROPY_TARGET} PRIVATE
     ${MICROPY_BOARD_DIR}
     "${PROJECT_SOURCE_DIR}"
     "${CMAKE_BINARY_DIR}"
+    ${MICROPY_DIR}/lib/tinyusb/src
 )
 
 target_compile_options(${MICROPY_TARGET} PRIVATE

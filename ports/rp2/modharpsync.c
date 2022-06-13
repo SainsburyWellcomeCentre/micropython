@@ -64,12 +64,13 @@ typedef struct _harpsync_obj_t {
     uint8_t tx;
     uint8_t rx;
     uint8_t invert;
+    int64_t calib_us;
     int64_t time_us;
 } harpsync_obj_t;
 
 STATIC harpsync_obj_t harpsync_obj[] = {
-    {{&harpsync_type}, uart0, 0, 0, MICROPY_HW_UART0_TX, MICROPY_HW_UART0_RX, 0, 0},
-    {{&harpsync_type}, uart1, 1, 0, MICROPY_HW_UART1_TX, MICROPY_HW_UART1_RX, 0, 0},
+    {{&harpsync_type}, uart0, 0, 0, MICROPY_HW_UART0_TX, MICROPY_HW_UART0_RX, 0, 1000000 - 240, 0},
+    {{&harpsync_type}, uart1, 1, 0, MICROPY_HW_UART1_TX, MICROPY_HW_UART1_RX, 0, 1000000 - 240, 0},
 };
 
 STATIC const char *_invert_name[] = {"None", "INV_TX", "INV_RX", "INV_TX|INV_RX"};
@@ -78,8 +79,7 @@ STATIC const char *_invert_name[] = {"None", "INV_TX", "INV_RX", "INV_TX|INV_RX"
 // IRQ handling
 
 STATIC inline void uart_service_interrupt(harpsync_obj_t *self) {
-    static const int64_t calib_us = 10 - 572;   // IRQ latency = 10 us, sync end 572 us early.
-    static uint8_t rx_buffer[6] = {0xaa, 0xaf, 0, 0 ,0 ,0};
+    static uint8_t rx_buffer[6] = {0xaa, 0xaf, 0, 0, 0, 0};
     static uint8_t rx_buf_idx = 0;
     if (uart_get_hw(self->uart)->mis & UART_UARTMIS_RXMIS_BITS) { // rx interrupt?
         // clear interrupt bit
@@ -92,8 +92,8 @@ STATIC inline void uart_service_interrupt(harpsync_obj_t *self) {
             } else {
                 rx_buffer[rx_buf_idx++] = rx_byte;
                 if (rx_buf_idx == sizeof(rx_buffer)) {
-                    int64_t time_s = *((uint32_t*)(&rx_buffer[2])) + 1;
-                    self->time_us = 1000000 * time_s + calib_us - time_us_64();
+                    int64_t time_s = *((uint32_t*)(&rx_buffer[2]));
+                    self->time_us = 1000000 * time_s + self->calib_us - time_us_64();
                     rx_buf_idx = 0;
                 }
             }
@@ -119,11 +119,12 @@ STATIC void harpsync_print(const mp_print_t *print, mp_obj_t self_in, mp_print_k
 }
 
 STATIC void harpsync_init_helper(harpsync_obj_t *self, size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    enum {ARG_tx, ARG_rx, ARG_invert};
+    enum {ARG_tx, ARG_rx, ARG_invert, ARG_calib};
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_tx, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE} },
         { MP_QSTR_rx, MP_ARG_KW_ONLY | MP_ARG_OBJ, {.u_rom_obj = MP_ROM_NONE} },
         { MP_QSTR_invert, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
+        { MP_QSTR_calib, MP_ARG_KW_ONLY | MP_ARG_INT, {.u_int = -1} },
     };
 
     // Parse args.
@@ -152,6 +153,11 @@ STATIC void harpsync_init_helper(harpsync_obj_t *self, size_t n_args, const mp_o
             mp_raise_ValueError(MP_ERROR_TEXT("bad inversion mask"));
         }
         self->invert = args[ARG_invert].u_int;
+    }
+
+    // Set calibration if configured.
+    if (args[ARG_calib].u_int >= 0) {
+        self->calib_us = 1000000 - args[ARG_calib].u_int;
     }
 
     // Initialise the UART peripheral if any arguments given, or it was not initialised previously.
